@@ -12,9 +12,15 @@ import (
 	// "github.com/bencode-parser/marshal"
 )
 
+type Metadata struct {
+	Info   string   `bencode:"info"`
+	Hashes []string `bencode:"hashes"`
+}
+
 type Packet struct {
-	Length int    `bencode:"length"`
-	Data   string `bencode:"data"`
+	Length int      `bencode:"length"`
+	Data   string   `bencode:"data"`
+	Meta   Metadata `bencode:"meta"`
 }
 
 func TestInt(t *testing.T) {
@@ -29,7 +35,6 @@ func TestString(t *testing.T) {
 	val := []byte("4:four")
 	unmarshal.UnMarshal(val, &i)
 	assert.Equal(t, "four", i)
-
 }
 
 func TestIntArr(t *testing.T) {
@@ -39,16 +44,18 @@ func TestIntArr(t *testing.T) {
 	assert.Equal(t, [2]int{2, 4}, arr)
 	var arrStr []string
 	valStr := []byte("l5:three4:foure")
-	unmarshal.UnMarshal(valStr, &arrStr)
+	_, res := unmarshal.UnMarshal(valStr, &arrStr)
+	fmt.Println(res)
 	assert.Equal(t, [2]string{"three", "four"}, arrStr)
 }
 
 func TestStruct(t *testing.T) {
 	var err error
 	p := Packet{}
-	val := []byte("d6:lengthi4e4:data4:eggse")
+	val := []byte("d6:lengthi4e4:data4:eggs4:metad4:info4:INFO6:hashesl5:three4:foureee")
+	// val := []byte("d6:lengthi4e4:data4:eggse")
 	err, res := unmarshal.UnMarshal(val, &p)
-	assert.Equal(t, Packet{Length: 4, Data: "eggs"}, res)
+	assert.Equal(t, Packet{Length: 4, Data: "eggs", Meta: Metadata{Info: "INFO", Hashes: []string{"three", "four"}}}, res)
 	fmt.Println(err)
 	fmt.Println(res)
 }

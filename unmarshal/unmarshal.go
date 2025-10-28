@@ -14,7 +14,6 @@ func convertSlice(val reflect.Value, dest any) error {
 	newSlice := reflect.MakeSlice(destVal.Elem().Type(), 0, val.Len()+1)
 	for i := 0; i < val.Len(); i++ {
 		res := val.Index(i)
-		fmt.Println("res", res, res.CanConvert(destVal.Elem().Type()))
 		if res.CanConvert(destVal.Elem().Type().Elem()) {
 			res = res.Convert(destVal.Elem().Type().Elem())
 			newSlice = reflect.Append(newSlice, res)
@@ -24,32 +23,41 @@ func convertSlice(val reflect.Value, dest any) error {
 	return nil
 }
 
+type CoreRes struct {
+	RefVal reflect.Value
+	Val    any
+}
+
 func UnMarshal(e []byte, val any) (err error, v any) {
 	if reflect.TypeOf(val).Kind() != reflect.Pointer {
-		return fmt.Errorf("cannot pass a value instead of a reference"), nil
+		return fmt.Errorf("function expects a apointer received value"), nil
 	}
 
 	read := 0
-	err, res := unMarshalCore(e, val, &read)
+	valRef := reflect.ValueOf(val)
+	corRes := CoreRes{
+		Val: val,
+		RefVal: valRef,
+	}
+	err, res := unMarshalCore(e, corRes, &read)
 
 	if err != nil {
 		return err, nil
 	}
 
-	valRef := reflect.ValueOf(val)
-	resRef := reflect.ValueOf(res)
-
-	if valRef.Elem().Kind() != resRef.Kind() {
+	if valRef.Elem().Kind() != res.RefVal.Kind() {
 		return fmt.Errorf("type mismatched"), nil
 	}
 
 	// convertSlice(resRef, val)
-	// valRef.Elem().Set(resRef)
+	valRef.Elem().Set(res.RefVal)
 
-	return nil, res
+	return nil, res.Val
 }
 
-func unMarshalCore(e []byte, val any, i *int) (err error, va any) {
+func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
+	var err error
+
 	reader := bytes.NewReader(e[*i:])
 	initialByte := make([]byte, 1)
 	_, err = reader.Read(initialByte)
@@ -74,10 +82,11 @@ func unMarshalCore(e []byte, val any, i *int) (err error, va any) {
 
 		// incr for ":"
 		*i++
-		strVal := e[*i : *i+skip]
+		strVal := string(e[*i : *i+skip])
 		// NOTE
 		*i += skip
-		return nil, string(strVal)
+
+		return nil, &CoreRes{RefVal: reflect.ValueOf(strVal), Val: strVal}
 
 	case ibStr == "i":
 		*i++
@@ -94,7 +103,7 @@ func unMarshalCore(e []byte, val any, i *int) (err error, va any) {
 				return err, nil
 			}
 
-			return nil, f
+			return nil, &CoreRes{RefVal: reflect.ValueOf(f), Val: f}
 
 		} else {
 			//check for floats
@@ -103,8 +112,9 @@ func unMarshalCore(e []byte, val any, i *int) (err error, va any) {
 				return err, nil
 			}
 
-			return nil, v
+			return nil, &CoreRes{RefVal: reflect.ValueOf(v), Val: v}
 		}
+
 	case ibStr == "l":
 		var arr []any
 		*i++
@@ -113,43 +123,59 @@ func unMarshalCore(e []byte, val any, i *int) (err error, va any) {
 			if err != nil {
 				return err, nil
 			}
-			arr = append(arr, val)
+			arr = append(arr, val.Val)
 		}
 		*i++
-		return nil, arr
+		return nil, &CoreRes{RefVal: reflect.ValueOf(arr), Val: arr}
+
 	case ibStr == "d":
 		*i++
-		newStructP := reflect.New(reflect.TypeOf(val).Elem())
+		newStructP := reflect.New(val.RefVal.Elem().Type())
 		newStruct := newStructP.Elem()
 		for e[*i] != 'e' {
 			//explicit call since value and key are sequential
 			err, key := unMarshalCore(e, val, i)
-			err, val := unMarshalCore(e, val, i)
+
 			if err != nil {
-				fmt.Println(err)
 				return err, nil
 			}
-			if ok, name := doesStructHasProp(newStruct.Type(), reflect.ValueOf(key).String()); ok {
-				newStruct.FieldByName(name).Set(reflect.ValueOf(val))
+
+			ok, name, kind := structHasProp(newStruct.Type(), reflect.ValueOf(key.Val).String())
+
+			if ok {
+				if kind == reflect.Struct {
+					newVal := newStruct.FieldByName(name)
+					newValP := reflect.New(newVal.Type())
+					cr := CoreRes{
+						RefVal: newValP,
+					}
+					err, value := unMarshalCore(e, cr, i)
+					if err != nil {
+						return err, nil
+					}
+					newStruct.FieldByName(name).Set(value.RefVal)
+				} else {
+					err, value := unMarshalCore(e, val, i)
+					if err != nil {
+						return err, nil
+					}
+					newStruct.FieldByName(name).Set(reflect.ValueOf(value.Val))
+				}
 			}
 		}
-
-		//build the struct
 		*i++
-		return nil, newStruct 
-
-		//handle dict
+		return nil, &CoreRes{RefVal: newStruct}
 	default:
-		return fmt.Errorf("unkown initial byte, exiting"), nil
+		return fmt.Errorf("invalid bencode text"), nil
 	}
 }
 
-func doesStructHasProp(st reflect.Type, key string) (bool, string) {
+func structHasProp(st reflect.Type, key string) (bool, string, reflect.Kind) {
 	for i := 0; i < st.NumField(); i++ {
 		tag := st.Field(i).Tag.Get("bencode")
 		if tag == key {
-			return true, st.Field(i).Name
+			return true, st.Field(i).Name, st.Field(i).Type.Kind()
 		}
 	}
-	return false, ""
+	return false, "", reflect.Struct
 }
