@@ -37,16 +37,16 @@ func TestString(t *testing.T) {
 	assert.Equal(t, "four", i)
 }
 
-func TestIntArr(t *testing.T) {
+func TestArr(t *testing.T) {
 	var arr []int
 	val := []byte("li2ei4ee")
 	unmarshal.UnMarshal(val, &arr)
-	assert.Equal(t, [2]int{2, 4}, arr)
+	assert.Equal(t, []int{2, 4}, arr)
 	var arrStr []string
 	valStr := []byte("l5:three4:foure")
 	_, res := unmarshal.UnMarshal(valStr, &arrStr)
 	fmt.Println(res)
-	assert.Equal(t, [2]string{"three", "four"}, arrStr)
+	assert.Equal(t, []string{"three", "four"}, arrStr)
 }
 
 func TestStruct(t *testing.T) {

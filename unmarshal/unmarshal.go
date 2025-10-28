@@ -9,23 +9,8 @@ import (
 	"strings"
 )
 
-func convertSlice(val reflect.Value, dest any) error {
-	destVal := reflect.ValueOf(dest)
-	newSlice := reflect.MakeSlice(destVal.Elem().Type(), 0, val.Len()+1)
-	for i := 0; i < val.Len(); i++ {
-		res := val.Index(i)
-		if res.CanConvert(destVal.Elem().Type().Elem()) {
-			res = res.Convert(destVal.Elem().Type().Elem())
-			newSlice = reflect.Append(newSlice, res)
-		}
-	}
-	destVal.Elem().Set(newSlice)
-	return nil
-}
-
 type CoreRes struct {
 	RefVal reflect.Value
-	Val    any
 }
 
 func UnMarshal(e []byte, val any) (err error, v any) {
@@ -34,9 +19,8 @@ func UnMarshal(e []byte, val any) (err error, v any) {
 	}
 
 	read := 0
-	valRef := reflect.ValueOf(val)
+	valRef := reflect.ValueOf(val).Elem()
 	corRes := CoreRes{
-		Val: val,
 		RefVal: valRef,
 	}
 	err, res := unMarshalCore(e, corRes, &read)
@@ -45,20 +29,31 @@ func UnMarshal(e []byte, val any) (err error, v any) {
 		return err, nil
 	}
 
-	if valRef.Elem().Kind() != res.RefVal.Kind() {
+	fmt.Println("res", res)
+
+	if res.RefVal.Kind() == reflect.Struct {
+		for i := 0; i < res.RefVal.Type().NumField(); i++ {
+			field := res.RefVal.Type().Field(i).Name
+			fmt.Println("field", field)
+		}
+	}
+
+	if valRef.Kind() != res.RefVal.Kind() {
 		return fmt.Errorf("type mismatched"), nil
 	}
 
 	// convertSlice(resRef, val)
-	valRef.Elem().Set(res.RefVal)
+	valRef.Set(res.RefVal)
 
-	return nil, res.Val
+	return nil, res.RefVal
 }
 
 func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
+	fmt.Println("valRef", val.RefVal, val.RefVal.Type())
 	var err error
 
 	reader := bytes.NewReader(e[*i:])
+	fmt.Println(string(e[*i:]))
 	initialByte := make([]byte, 1)
 	_, err = reader.Read(initialByte)
 
@@ -86,7 +81,7 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 		// NOTE
 		*i += skip
 
-		return nil, &CoreRes{RefVal: reflect.ValueOf(strVal), Val: strVal}
+		return nil, &CoreRes{RefVal: reflect.ValueOf(strVal)}
 
 	case ibStr == "i":
 		*i++
@@ -103,7 +98,7 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 				return err, nil
 			}
 
-			return nil, &CoreRes{RefVal: reflect.ValueOf(f), Val: f}
+			return nil, &CoreRes{RefVal: reflect.ValueOf(f)}
 
 		} else {
 			//check for floats
@@ -112,25 +107,25 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 				return err, nil
 			}
 
-			return nil, &CoreRes{RefVal: reflect.ValueOf(v), Val: v}
+			return nil, &CoreRes{RefVal: reflect.ValueOf(v)}
 		}
 
 	case ibStr == "l":
-		var arr []any
+		var arr = reflect.MakeSlice(val.RefVal.Type(), val.RefVal.Len(), val.RefVal.Cap())
 		*i++
 		for e[*i] != 'e' {
 			err, val := unMarshalCore(e, val, i)
 			if err != nil {
 				return err, nil
 			}
-			arr = append(arr, val.Val)
+			arr = reflect.Append(arr, val.RefVal)
 		}
 		*i++
-		return nil, &CoreRes{RefVal: reflect.ValueOf(arr), Val: arr}
+		return nil, &CoreRes{RefVal: arr}
 
 	case ibStr == "d":
 		*i++
-		newStructP := reflect.New(val.RefVal.Elem().Type())
+		newStructP := reflect.New(val.RefVal.Type())
 		newStruct := newStructP.Elem()
 		for e[*i] != 'e' {
 			//explicit call since value and key are sequential
@@ -140,14 +135,14 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 				return err, nil
 			}
 
-			ok, name, kind := structHasProp(newStruct.Type(), reflect.ValueOf(key.Val).String())
+			ok, name, kind := structHasProp(newStruct.Type(), key.RefVal.String())
 
 			if ok {
 				if kind == reflect.Struct {
 					newVal := newStruct.FieldByName(name)
 					newValP := reflect.New(newVal.Type())
 					cr := CoreRes{
-						RefVal: newValP,
+						RefVal: newValP.Elem(),
 					}
 					err, value := unMarshalCore(e, cr, i)
 					if err != nil {
@@ -155,11 +150,19 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 					}
 					newStruct.FieldByName(name).Set(value.RefVal)
 				} else {
-					err, value := unMarshalCore(e, val, i)
+					if kind == reflect.Slice {
+						fmt.Println("got slice", name, kind, newStruct)
+					}
+					newVal := newStruct.FieldByName(name)
+					newValP := reflect.New(newVal.Type())
+					cr := CoreRes{
+						RefVal: newValP.Elem(),
+					}
+					err, value := unMarshalCore(e, cr, i)
 					if err != nil {
 						return err, nil
 					}
-					newStruct.FieldByName(name).Set(reflect.ValueOf(value.Val))
+					newStruct.FieldByName(name).Set(value.RefVal)
 				}
 			}
 		}
