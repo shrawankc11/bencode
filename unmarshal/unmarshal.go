@@ -34,7 +34,6 @@ func UnMarshal(e []byte, val any) (err error) {
 	}
 
 	valRef.Set(res.RefVal)
-
 	return nil
 }
 
