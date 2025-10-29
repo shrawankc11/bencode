@@ -18,9 +18,9 @@ type Metadata struct {
 }
 
 type Packet struct {
-	Length int      `bencode:"length"`
-	Data   string   `bencode:"data"`
-	Meta   Metadata `bencode:"meta"`
+	Length int        `bencode:"length"`
+	Data   string     `bencode:"data"`
+	Meta   []Metadata `bencode:"meta"`
 }
 
 func TestInt(t *testing.T) {
@@ -42,20 +42,33 @@ func TestArr(t *testing.T) {
 	val := []byte("li2ei4ee")
 	unmarshal.UnMarshal(val, &arr)
 	assert.Equal(t, []int{2, 4}, arr)
+	fmt.Println("res", arr)
+	var arrNest [][]int
+	val = []byte("lli2eee")
+	unmarshal.UnMarshal(val, &arrNest)
+	assert.Equal(t, [][]int{{2}}, arrNest)
+	fmt.Println("res", arrNest)
 	var arrStr []string
 	valStr := []byte("l5:three4:foure")
-	_, res := unmarshal.UnMarshal(valStr, &arrStr)
-	fmt.Println(res)
+	unmarshal.UnMarshal(valStr, &arrStr)
+	fmt.Println("res", arrStr)
 	assert.Equal(t, []string{"three", "four"}, arrStr)
 }
 
 func TestStruct(t *testing.T) {
-	var err error
 	p := Packet{}
-	val := []byte("d6:lengthi4e4:data4:eggs4:metad4:info4:INFO6:hashesl5:three4:foureee")
-	// val := []byte("d6:lengthi4e4:data4:eggse")
-	err, res := unmarshal.UnMarshal(val, &p)
-	assert.Equal(t, Packet{Length: 4, Data: "eggs", Meta: Metadata{Info: "INFO", Hashes: []string{"three", "four"}}}, res)
-	fmt.Println(err)
-	fmt.Println(res)
+	val := []byte("d6:lengthi4e4:data4:eggs4:metald4:info4:INFO6:hashesl5:three4:foureeee")
+	err := unmarshal.UnMarshal(val, &p)
+	assert.ErrorIs(t, err, nil)
+	fmt.Println("res struct", p)
+	assert.Equal(
+		t,
+		Packet{
+			Length: 4,
+			Data:   "eggs",
+			Meta: []Metadata{
+				{Info: "INFO", Hashes: []string{"three", "four"}},
+				// {Info: "INFO", Hashes: []string{"three", "four"}},
+			}},
+		p)
 }
