@@ -1,7 +1,6 @@
 package marshal_test
 
 import (
-	"fmt"
 
 	"github.com/stretchr/testify/assert"
 
@@ -27,7 +26,6 @@ func TestReflect(t *testing.T) {
 	user := User{Name: "Dingus", Address: Address{Zip: "1234", Country: "Nepal", Lat: 13.232, Long: 12.12312}}
 	var res []byte
 	res, _ = marshal.Marshal(user)
-	fmt.Println(string(res))
 
 	res, _ = marshal.Marshal("dinguss")
 	assert.Equal(t, res, []byte("7:dinguss"))
