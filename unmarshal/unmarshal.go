@@ -1,7 +1,6 @@
 package unmarshal
 
 import (
-	"bytes"
 	"fmt"
 	"log"
 	"reflect"
@@ -13,11 +12,10 @@ type CoreRes struct {
 	RefVal reflect.Value
 }
 
-func UnMarshal(e []byte, val any) (err error) {
+func UnMarshaler(e []byte, val any) (err error) {
 	if reflect.TypeOf(val).Kind() != reflect.Pointer {
-		return fmt.Errorf("function expects a apointer received value")
+		return fmt.Errorf("function expects a pointer received value")
 	}
-
 	read := 0
 	valRef := reflect.ValueOf(val).Elem()
 	corRes := CoreRes{
@@ -38,16 +36,7 @@ func UnMarshal(e []byte, val any) (err error) {
 }
 
 func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
-	var err error
-
-	reader := bytes.NewReader(e[*i:])
-	initialByte := make([]byte, 1)
-	_, err = reader.Read(initialByte)
-
-	if err != nil {
-		return err, nil
-	}
-
+	initialByte := e[*i: *i+1]
 	ibStr := string(initialByte)
 
 	switch {
@@ -76,7 +65,6 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 		}
 		*i++
 
-		//fix this float check
 		if i := strings.IndexByte(strData, '.'); i != -1 {
 			f, err := strconv.ParseFloat(strData, 64)
 
@@ -102,10 +90,18 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 			cr := CoreRes{
 				RefVal: val.RefVal,
 			}
-			if val.RefVal.Type().Elem().Kind() == reflect.Slice {
-				cr.RefVal = reflect.MakeSlice(val.RefVal.Type().Elem(), val.RefVal.Len(), val.RefVal.Cap())
-			} else if val.RefVal.Type().Elem().Kind() == reflect.Struct {
-				nestedStruct := reflect.New(val.RefVal.Type().Elem())
+			/**
+			* Array elements can be of slice or struct type.
+			* cr.RefVal should point to the elements type.
+			* For normal data types no need to update cr.RefVal since it is not used.
+			 */
+
+			currentElement := val.RefVal.Type().Elem()
+
+			if currentElement.Kind() == reflect.Slice {
+				cr.RefVal = reflect.MakeSlice(currentElement, val.RefVal.Len(), val.RefVal.Cap())
+			} else if currentElement.Kind() == reflect.Struct {
+				nestedStruct := reflect.New(currentElement)
 				cr.RefVal = nestedStruct.Elem()
 			}
 			err, val := unMarshalCore(e, cr, i)
@@ -131,32 +127,32 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 			ok, name, kind := structHasProp(newStruct.Type(), key.RefVal.String())
 
 			if ok {
-				if kind == reflect.Struct {
+				cr := CoreRes{
+					RefVal: val.RefVal,
+				}
+
+				/*
+				* Struct element's data type can be slice or struct.
+				* In case of iterators cr.RefVal referes to the elements data type.
+				* For normal data types no need to update cr.RefVal.
+				 */
+				switch kind {
+				case reflect.Struct:
+					newVal := newStruct.FieldByName(name)
+					newStruct := reflect.New(newVal.Type())
+					cr.RefVal = newStruct.Elem()
+				case reflect.Slice:
 					newVal := newStruct.FieldByName(name)
 					newValP := reflect.New(newVal.Type())
-					cr := CoreRes{
-						RefVal: newValP.Elem(),
-					}
-					err, value := unMarshalCore(e, cr, i)
-					if err != nil {
-						return err, nil
-					}
-					newStruct.FieldByName(name).Set(value.RefVal)
-				} else {
-					cr := CoreRes{
-						RefVal: val.RefVal,
-					}
-					if kind == reflect.Slice {
-						newVal := newStruct.FieldByName(name)
-						newValP := reflect.New(newVal.Type())
-						cr.RefVal = newValP.Elem()
-					}
-					err, value := unMarshalCore(e, cr, i)
-					if err != nil {
-						return err, nil
-					}
-					newStruct.FieldByName(name).Set(value.RefVal)
+					cr.RefVal = newValP.Elem()
 				}
+
+				err, value := unMarshalCore(e, cr, i)
+				if err != nil {
+					return err, nil
+				}
+
+				newStruct.FieldByName(name).Set(value.RefVal)
 			}
 		}
 		*i++

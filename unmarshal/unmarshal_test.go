@@ -26,31 +26,31 @@ type Packet struct {
 func TestInt(t *testing.T) {
 	var i float64
 	val := []byte("i-3.1e")
-	unmarshal.UnMarshal(val, &i)
+	unmarshal.UnMarshaler(val, &i)
 	assert.Equal(t, -3.1, i)
 }
 
 func TestString(t *testing.T) {
 	var i string
 	val := []byte("4:four")
-	unmarshal.UnMarshal(val, &i)
+	unmarshal.UnMarshaler(val, &i)
 	assert.Equal(t, "four", i)
 }
 
 func TestArr(t *testing.T) {
 	var arr []int
 	val := []byte("li2ei4ee")
-	unmarshal.UnMarshal(val, &arr)
+	unmarshal.UnMarshaler(val, &arr)
 	assert.Equal(t, []int{2, 4}, arr)
 	fmt.Println("res", arr)
 	var arrNest [][]int
 	val = []byte("lli2eee")
-	unmarshal.UnMarshal(val, &arrNest)
+	unmarshal.UnMarshaler(val, &arrNest)
 	assert.Equal(t, [][]int{{2}}, arrNest)
 	fmt.Println("res", arrNest)
 	var arrStr []string
 	valStr := []byte("l5:three4:foure")
-	unmarshal.UnMarshal(valStr, &arrStr)
+	unmarshal.UnMarshaler(valStr, &arrStr)
 	fmt.Println("res", arrStr)
 	assert.Equal(t, []string{"three", "four"}, arrStr)
 }
@@ -58,7 +58,7 @@ func TestArr(t *testing.T) {
 func TestStruct(t *testing.T) {
 	p := Packet{}
 	val := []byte("d6:lengthi4e4:data4:eggs4:metald4:info4:INFO6:hashesl5:three4:foureeee")
-	err := unmarshal.UnMarshal(val, &p)
+	err := unmarshal.UnMarshaler(val, &p)
 	assert.ErrorIs(t, err, nil)
 	fmt.Println("res struct", p)
 	assert.Equal(
@@ -68,7 +68,6 @@ func TestStruct(t *testing.T) {
 			Data:   "eggs",
 			Meta: []Metadata{
 				{Info: "INFO", Hashes: []string{"three", "four"}},
-				// {Info: "INFO", Hashes: []string{"three", "four"}},
 			}},
 		p)
 }
