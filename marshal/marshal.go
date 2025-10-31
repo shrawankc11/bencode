@@ -17,7 +17,7 @@ func upRes(res []byte, app []byte) []byte {
 	return fmt.Appendf(res, "%s", app)
 }
 
-func Marshal(val any) ([]byte, error) {
+func Marshaler(val any) ([]byte, error) {
 	v := reflect.ValueOf(val)
 	return marshalCore(v, reflect.TypeOf(val))
 }
