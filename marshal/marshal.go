@@ -28,7 +28,7 @@ func marshalCore(v reflect.Value, t reflect.Type) ([]byte, error) {
 	case reflect.Slice:
 		result = upRes(result, []byte("l"))
 		for i := 0; i < v.Len(); i++ {
-			res, _ := marshalCore(v.Index(i), t)
+			res, _ := marshalCore(v.Index(i), v.Index(i).Type())
 			result = upRes(result, res)
 		}
 		result = upRes(result, []byte("e"))
@@ -36,7 +36,12 @@ func marshalCore(v reflect.Value, t reflect.Type) ([]byte, error) {
 		result = upRes(result, []byte("d"))
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			res, _ := marshalCore(reflect.ValueOf(t.Field(i).Name), t.Field(i).Type)
+			fieldType := t.Field(i)
+			keyName := fieldType.Tag.Get("bencode")
+			if len(keyName) == 0 {
+				continue
+			}
+			res, _ := marshalCore(reflect.ValueOf(keyName), t.Field(i).Type)
 			result = upRes(result, res)
 			res, _ = marshalCore(field, t.Field(i).Type)
 			result = upRes(result, res)

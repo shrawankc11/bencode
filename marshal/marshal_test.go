@@ -1,6 +1,7 @@
 package marshal_test
 
 import (
+	"fmt"
 
 	"github.com/stretchr/testify/assert"
 
@@ -22,22 +23,27 @@ type Packet struct {
 }
 
 type Address struct {
-	Country string
-	Zip     string
-	Lat     float32
-	Long    float64
+	Country string  `bencode:"country"`
+	Zip     string  `bencode:"zip"`
+	Lat     float32 `bencode:"lat"`
+	Long    float64 `bencode:"long"`
 }
 
 type User struct {
-	Name    string `bencode:"name"`
-	Address Address
+	Name    string  `bencode:"name"`
+	Address Address `bencode:"address"`
 }
 
-func TestReflect(t *testing.T) {
+func TestStruct(t *testing.T){
 	user := User{Name: "Dingus", Address: Address{Zip: "1234", Country: "Nepal", Lat: 13.232, Long: 12.12312}}
 	var res []byte
 	res, _ = marshal.Marshaler(user)
+	fmt.Println(string(res))
+	assert.Equal(t, res, []byte("d4:name6:Dingus7:addressd3zip:412347:country5:Nepal3:lati3.232e4:longi12.12312eee"))
+}
 
+func TestSimple(t *testing.T) {
+	var res []byte
 	res, _ = marshal.Marshaler("dinguss")
 	assert.Equal(t, res, []byte("7:dinguss"))
 
@@ -53,11 +59,11 @@ func TestReflect(t *testing.T) {
 
 func TestWhole(t *testing.T) {
 	p := Packet{
-			Length: 4,
-			Data:   "eggs",
-			Meta: []Metadata{
-				{Info: "INFO", Hashes: []string{"three", "four"}},
-			},
+		Length: 4,
+		Data:   "eggs",
+		Meta: []Metadata{
+			{Info: "INFO", Hashes: []string{"three", "four"}},
+		},
 	}
 	res, _ := marshal.Marshaler(p)
 	val := []byte("d6:lengthi4e4:data4:eggs4:metald4:info4:INFO6:hashesl5:three4:foureeee")
