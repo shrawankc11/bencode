@@ -91,8 +91,8 @@ func unMarshalCore(e []byte, val CoreRes, i *int) (error, *CoreRes) {
 				RefVal: val.RefVal,
 			}
 			/**
-			* Array elements can be of slice or struct type.
-			* cr.RefVal should point to the elements type.
+			* Array elements can be of type slice or struct.
+			* cr.RefVal should point to the element's type.
 			* For normal data types no need to update cr.RefVal since it is not used.
 			 */
 
