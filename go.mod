@@ -1,4 +1,4 @@
-module github.com/bencode
+module github.com/shrawankc11/bencode
 
 go 1.25.1
 
