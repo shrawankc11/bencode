@@ -1,4 +1,4 @@
-module github.com/bencode-parser
+module github.com/bencode
 
 go 1.25.1
 
