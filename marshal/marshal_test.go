@@ -8,7 +8,7 @@ import (
 	// "github.com/stretchr/testify/require"
 	"testing"
 
-	"github.com/bencode-parser/marshal"
+	"github.com/bencode/marshal"
 )
 
 type Metadata struct {

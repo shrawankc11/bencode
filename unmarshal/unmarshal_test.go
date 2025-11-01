@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bencode-parser/unmarshal"
+	"github.com/bencode/unmarshal"
 	"github.com/stretchr/testify/assert"
 	// "github.com/bencode-parser/marshal"
 )

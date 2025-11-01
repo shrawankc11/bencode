@@ -1,8 +1,8 @@
 package bencode
 
 import (
-	"github.com/bencode-parser/unmarshal"
-	"github.com/bencode-parser/marshal"
+	"github.com/bencode/unmarshal"
+	"github.com/bencode/marshal"
 )
 
 
