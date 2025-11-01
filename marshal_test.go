@@ -1,0 +1,59 @@
+package bencode_test
+
+import (
+	"fmt"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/shrawankc11/bencode"
+
+	// "github.com/stretchr/testify/require"
+	"testing"
+)
+
+type Address struct {
+	Country string  `bencode:"country"`
+	Zip     string  `bencode:"zip"`
+	Lat     float32 `bencode:"lat"`
+	Long    float64 `bencode:"long"`
+}
+
+type User struct {
+	Name    string  `bencode:"name"`
+	Address Address `bencode:"address"`
+}
+
+func TestStruct(t *testing.T){
+	user := User{Name: "Dingus", Address: Address{Zip: "1234", Country: "Nepal", Lat: 13.232, Long: 12.12312}}
+	var res []byte
+	res, _ = bencode.Marshal(user)
+	fmt.Println(string(res))
+	assert.Equal(t, res, []byte("d4:name6:Dingus7:addressd3zip:412347:country5:Nepal3:lati3.232e4:longi12.12312eee"))
+}
+
+func TestSimple(t *testing.T) {
+	var res []byte
+	res, _ = bencode.Marshal("dinguss")
+	assert.Equal(t, res, []byte("7:dinguss"))
+
+	res, _ = bencode.Marshal(1)
+	assert.Equal(t, res, []byte("i1e"))
+
+	res, _ = bencode.Marshal([]int{1, 2, 3})
+	assert.Equal(t, res, []byte("li1ei2ei3ee"))
+
+	res, _ = bencode.Marshal([]string{"one", "two", "three"})
+	assert.Equal(t, res, []byte("l3:one3:two5:threee"))
+}
+
+func TestWhole(t *testing.T) {
+	p := Packet{
+		Length: 4,
+		Data:   "eggs",
+		Meta: []Metadata{
+			{Info: "INFO", Hashes: []string{"three", "four"}},
+		},
+	}
+	res, _ := bencode.Marshal(p)
+	val := []byte("d6:lengthi4e4:data4:eggs4:metald4:info4:INFO6:hashesl5:three4:foureeee")
+	assert.Equal(t, res, val)
+}
