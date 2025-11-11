@@ -1,7 +1,9 @@
-package bencode 
+package bencode
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"reflect"
 	"strconv"
@@ -12,7 +14,15 @@ type coreRes struct {
 	RefVal reflect.Value
 }
 
-func UnMarshal(e []byte, val any) (err error) {
+func FromReader(reader io.Reader) ([]byte, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(data, []byte("\n")), nil
+}
+
+func UnMarshal(reader io.Reader, val any) (err error) {
 	if reflect.TypeOf(val).Kind() != reflect.Pointer {
 		return fmt.Errorf("function expects a pointer received value")
 	}
@@ -21,7 +31,13 @@ func UnMarshal(e []byte, val any) (err error) {
 	corRes := coreRes{
 		RefVal: valRef,
 	}
-	err, res := unMarshalCore(e, corRes, &read)
+	e, err := FromReader(reader)
+
+	if err != nil {
+		return err
+	}
+
+	res, err := unMarshalCore(e, corRes, &read)
 
 	if err != nil {
 		return err
@@ -35,8 +51,8 @@ func UnMarshal(e []byte, val any) (err error) {
 	return nil
 }
 
-func unMarshalCore(e []byte, val coreRes, i *int) (error, *coreRes) {
-	initialByte := e[*i: *i+1]
+func unMarshalCore(e []byte, val coreRes, i *int) (*coreRes, error) {
+	initialByte := e[*i : *i+1]
 	ibStr := string(initialByte)
 
 	switch {
@@ -48,14 +64,14 @@ func unMarshalCore(e []byte, val coreRes, i *int) (error, *coreRes) {
 		skip, err := strconv.Atoi(str)
 		if err != nil {
 			log.Fatal(err)
-			return err, nil
+			return nil, err
 		}
 
 		*i++
 		strVal := string(e[*i : *i+skip])
 		*i += skip
 
-		return nil, &coreRes{RefVal: reflect.ValueOf(strVal)}
+		return &coreRes{RefVal: reflect.ValueOf(strVal)}, nil
 
 	case ibStr == "i":
 		*i++
@@ -69,18 +85,18 @@ func unMarshalCore(e []byte, val coreRes, i *int) (error, *coreRes) {
 			f, err := strconv.ParseFloat(strData, 64)
 
 			if err != nil {
-				return err, nil
+				return nil, err
 			}
 
-			return nil, &coreRes{RefVal: reflect.ValueOf(f)}
+			return &coreRes{RefVal: reflect.ValueOf(f)}, nil
 
 		} else {
 			v, err := strconv.Atoi(strData)
 			if err != nil {
-				return err, nil
+				return nil, err
 			}
 
-			return nil, &coreRes{RefVal: reflect.ValueOf(v)}
+			return &coreRes{RefVal: reflect.ValueOf(v)}, nil
 		}
 
 	case ibStr == "l":
@@ -104,24 +120,24 @@ func unMarshalCore(e []byte, val coreRes, i *int) (error, *coreRes) {
 				nestedStruct := reflect.New(currentElement)
 				cr.RefVal = nestedStruct.Elem()
 			}
-			err, val := unMarshalCore(e, cr, i)
+			val, err := unMarshalCore(e, cr, i)
 			if err != nil {
-				return err, nil
+				return nil, err
 			}
 			arr = reflect.Append(arr, val.RefVal)
 		}
 		*i++
-		return nil, &coreRes{RefVal: arr}
+		return &coreRes{RefVal: arr}, nil
 
 	case ibStr == "d":
 		*i++
 		newStructP := reflect.New(val.RefVal.Type())
 		newStruct := newStructP.Elem()
 		for e[*i] != 'e' {
-			err, key := unMarshalCore(e, val, i)
+			key, err := unMarshalCore(e, val, i)
 
 			if err != nil {
-				return err, nil
+				return nil, err
 			}
 
 			ok, name, kind := structHasProp(newStruct.Type(), key.RefVal.String())
@@ -137,28 +153,24 @@ func unMarshalCore(e []byte, val coreRes, i *int) (error, *coreRes) {
 				* For normal data types no need to update cr.RefVal.
 				 */
 				switch kind {
-				case reflect.Struct:
-					newVal := newStruct.FieldByName(name)
-					newStruct := reflect.New(newVal.Type())
-					cr.RefVal = newStruct.Elem()
-				case reflect.Slice:
-					newVal := newStruct.FieldByName(name)
-					newValP := reflect.New(newVal.Type())
-					cr.RefVal = newValP.Elem()
+				case reflect.Struct, reflect.Slice:
+					field := newStruct.FieldByName(name)
+					newRefVal := reflect.New(field.Type())
+					cr.RefVal = newRefVal.Elem()
 				}
 
-				err, value := unMarshalCore(e, cr, i)
+				value, err := unMarshalCore(e, cr, i)
 				if err != nil {
-					return err, nil
+					return nil, err
 				}
 
 				newStruct.FieldByName(name).Set(value.RefVal)
 			}
 		}
 		*i++
-		return nil, &coreRes{RefVal: newStruct}
+		return &coreRes{RefVal: newStruct}, nil
 	default:
-		return fmt.Errorf("invalid bencode text"), nil
+		return nil, fmt.Errorf("invalid bencode text")
 	}
 }
 
