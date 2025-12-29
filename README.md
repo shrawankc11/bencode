@@ -21,11 +21,11 @@ Install the package with:
 
 	go get github.com/shrawankc11/bencode@latest
 
-Then import in your code:
+Then import into your code:
 
 	import "github.com/shrawankc11/bencode"
 
-(Adjust import path / module version as appropriate for your module setup.)
+(Adjust import path/module version as appropriate for your module setup.)
 
 ## Quick start
 
@@ -47,7 +47,7 @@ bencode.Unmarshal(reader, &user)
 fmt.Println("#%v", user)
 
 // Expected output (approx): {"email":"user@example", "name":"example", "address": ""} //default string value for address
-//Unmarshalling requires proper declaration of a struct. If a value exists in the bencoded text and not in the struct, then that value is skipped. 
+//Unmarshalling requires a proper declaration of a struct. Partially provided properties are skipped. 
 ```
 
 Encode from a variable:
@@ -79,9 +79,5 @@ Run the unit tests included with the package:
 	go test ./...
 
 The repo includes tests for both marshal and unmarshal behavior. Review `marshal_test.go` and `unmarshal_test.go` for examples of expected behavior and edge cases covered by the test suite.
-
-## Contributing
-
-- Are welcomed.
 
 ## License
